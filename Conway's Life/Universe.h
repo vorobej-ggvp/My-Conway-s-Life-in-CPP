@@ -25,6 +25,14 @@ public:
 		}
 	}
 
+	void setCell(int x, int y, bool state)
+	{
+		if (x >= 0 && x < width && y > 0 && y < height)
+		{
+			currentGrid[y * width + x] = state;
+		}
+	}
+
 	void update()
 	{
 		int w = this->width;
@@ -63,6 +71,11 @@ public:
 			}
 		}
 		return count;
+	}
+
+	void clear()
+	{
+		std::fill(currentGrid.begin(), currentGrid.end(), false);
 	}
 
 	bool isAlive(int x, int y) const

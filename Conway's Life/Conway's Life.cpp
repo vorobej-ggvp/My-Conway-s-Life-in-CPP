@@ -7,6 +7,16 @@
 
 using namespace std;
 
+void updateButtonText(sf::Text& text, const sf::RectangleShape& button, const string& newString)
+{
+	text.setString(newString);
+
+	sf::FloatRect bounds = text.getLocalBounds();
+	text.setOrigin(bounds.getCenter());
+
+	text.setPosition(button.getGlobalBounds().getCenter());
+}
+
 int main()
 {
 	try
@@ -27,7 +37,11 @@ int main()
 		BackgroundCell empty;
 		bool running = false;
 
-		sf::RectangleShape btn(sf::Vector2f(120, 40));
+		float currentZoom = 1.0f;
+		sf::View worldView(sf::FloatRect({ 0.f, 0.f }, { (float)windowSize, (float)windowSize }));
+		worldView.setViewport(sf::FloatRect({ 0.f, 0.f }, { 1.f, (float)windowSize / (windowSize + 50.f) }));
+
+		sf::RectangleShape btn({ 120.f, 40.f });
 		btn.setPosition(sf::Vector2f(10, uWindowSize + 10));
 		btn.setFillColor(sf::Color::Blue);
 
@@ -46,11 +60,20 @@ int main()
 
 		btnText.setPosition(btn.getGlobalBounds().getCenter());
 
-		world.toggleCell(50, 50);
-		world.toggleCell(51, 50);
-		world.toggleCell(52, 50);
-		world.toggleCell(52, 49);
-		world.toggleCell(51, 48);
+		sf::RectangleShape clearBtn({ 100.f, 40.f });
+		clearBtn.setFillColor(sf::Color(150, 50, 50));
+		clearBtn.setPosition({ windowSize - 110.f, windowSize + 10.f });
+
+		sf::Text clearText(font, "Clear");
+		clearText.setCharacterSize(20);
+		clearText.setOrigin(clearText.getLocalBounds().getCenter());
+		clearText.setPosition(clearBtn.getGlobalBounds().getCenter());
+
+		//world.toggleCell(50, 50);
+		//world.toggleCell(51, 50);
+		//world.toggleCell(52, 50);
+		//world.toggleCell(52, 49);
+		//world.toggleCell(51, 48);
 
 		deque<vector<bool>> history;
 		const size_t maxHistorySize = 4;
@@ -58,6 +81,9 @@ int main()
 		sf::Clock clock;
 		float timer = 0;
 		float delay = .1f;
+
+		bool isDrawingMode = false;
+		bool targetState = true;
 
 		while (window.isOpen())
 		{
@@ -69,39 +95,107 @@ int main()
 			{
 				if (event->is<sf::Event::Closed>()) window.close();
 
+				if (const auto* wheelEvent = event->getIf<sf::Event::MouseWheelScrolled>())
+				{
+					if (wheelEvent->wheel == sf::Mouse::Wheel::Vertical)
+					{
+						float zoomAmount = 1.1f;
+						if (wheelEvent->delta > 0 && currentZoom > 0.1f)
+						{
+							worldView.zoom(1.f / zoomAmount);
+							currentZoom /= zoomAmount;
+						}
+						if (wheelEvent->delta < 0 && currentZoom < 2.0f)
+						{
+							worldView.zoom(zoomAmount);
+							currentZoom *= zoomAmount;
+						}
+					}
+				}
+
 				if (const auto* mouseEvent = event->getIf<sf::Event::MouseButtonPressed>())
 				{
 					if (mouseEvent->button == sf::Mouse::Button::Left)
 					{
-						float clickX = static_cast<float>(mouseEvent->position.x);
-						float clickY = static_cast<float>(mouseEvent->position.y);
+						sf::Vector2f uiMousePos = window.mapPixelToCoords(mouseEvent->position, window.getDefaultView());
 
-						if (btn.getGlobalBounds().contains({ clickX, clickY }))
+						sf::Vector2f mousePos = window.mapPixelToCoords(mouseEvent->position, worldView);
+
+						if (clearBtn.getGlobalBounds().contains(uiMousePos))
 						{
-							running = !running;
+							running = false;
+							world.clear();
+							tracker.clear();
+							history.clear();
 
-							if (running)
+							btn.setFillColor(sf::Color::Blue);
+							updateButtonText(btnText, btn, "Start");
+
+							window.setTitle("Score: 0 | Alive: 0");
+
+							cout << "Field Cleared" << endl;
+						}
+
+						if (btn.getGlobalBounds().contains(uiMousePos))
+						{
+
+							if (!running)
 							{
+								if (btnText.getString() == "Start")
+								{
+									tracker.clear();
+									history.clear();
+
+									window.setTitle("Score: 0 | Alive: " + to_string(count(world.getState().begin(), world.getState().end(), true)));
+								}
+
+								running = true;
 								btn.setFillColor(sf::Color(100, 100, 100));
-								btnText.setString("Pause");
+								updateButtonText(btnText, btn, "Pause");
 							}
 							else
 							{
-									btn.setFillColor(sf::Color(200, 100, 0));
-									btnText.setString("Resume");
-												
+								running = false;
+								btn.setFillColor(sf::Color(200, 100, 0));
+								updateButtonText(btnText, btn, "Resume");
 							}
-
-							btnText.setOrigin(btnText.getLocalBounds().getCenter());
-							btnText.setPosition(btn.getGlobalBounds().getCenter());
 						}
 
-						else if (!running && clickY < windowSize)
+						else if (!running && mousePos.y < windowSize)
 						{
-							int gridX = static_cast<int>(clickX / cellSize);
-							int gridY = static_cast<int>(clickY / cellSize);
-							world.toggleCell(gridX, gridY);
-										
+							int x = static_cast<int>(mousePos.x / cellSize);
+							int y = static_cast<int>(mousePos.y / cellSize);
+
+							if (x >= 0 && x < gridSize && y > 0 && y < gridSize)
+							{
+								isDrawingMode = true;
+								targetState = !world.isAlive(x, y);
+								world.setCell(x, y, targetState);
+							}
+						}
+					}
+				}
+
+				if (const auto* mouseEvent = event->getIf<sf::Event::MouseButtonReleased>())
+				{
+					if (mouseEvent->button == sf::Mouse::Button::Left)
+					{
+						isDrawingMode = false;
+					}
+				}
+
+				if (const auto* mouseEvent = event->getIf<sf::Event::MouseMoved>())
+				{
+					if (isDrawingMode && !running)
+					{
+						sf::Vector2f mousePos = window.mapPixelToCoords(mouseEvent->position, worldView);
+
+						int x = static_cast<int>(mousePos.x / cellSize);
+						int y = static_cast<int>(mousePos.y / cellSize);
+
+						if (x >= 0 && x < gridSize && y > 0 && y < gridSize)
+						{
+							world.setCell(x, y, targetState);
 						}
 					}
 				}
@@ -129,10 +223,11 @@ int main()
 				if (isStagnant || aliveCount == 0)
 				{
 					running = false;
+
+					window.setTitle("Game over! Score: " + to_string(tracker.getScore()) + " | Alive: " + to_string(aliveCount));
+
 					btn.setFillColor(sf::Color::Blue);
-					btnText.setString("Start");
-					btnText.setOrigin(btnText.getLocalBounds().getCenter());
-					btnText.setPosition(btn.getGlobalBounds().getCenter());
+					updateButtonText(btnText, btn, "Start");
 
 					cout << "Game Over. Cells Alive: " << aliveCount << endl;
 				}
@@ -154,8 +249,11 @@ int main()
 
 			window.clear();
 
+
 			sf::VertexArray gridLines(sf::PrimitiveType::Lines);
 			sf::Color gridColor(40, 40, 40);
+
+			window.setView(worldView);
 
 			for (int i = 0; i <= gridSize; ++i)
 			{
@@ -177,8 +275,12 @@ int main()
 				}
 			}
 
+			window.setView(window.getDefaultView());
 			window.draw(btn);
 			window.draw(btnText);
+			window.draw(clearBtn);
+			window.draw(clearText);
+
 			window.display();
 		}
 	}

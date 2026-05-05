@@ -14,9 +14,15 @@ public:
 		if (history.empty() || state != history.back())
 		{
 			score++;
-			//history.push_back(state);
 			if (history.size() > 2) history.erase(history.begin());
 		}
 	}
+
+	void clear()
+	{
+		score = 0;
+		history.clear();
+	}
+
 	int getScore() const { return score; }
 };
