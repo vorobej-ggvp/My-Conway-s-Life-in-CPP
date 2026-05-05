@@ -69,6 +69,18 @@ int main()
 		clearText.setOrigin(clearText.getLocalBounds().getCenter());
 		clearText.setPosition(clearBtn.getGlobalBounds().getCenter());
 
+		sf::Text coordsText(font, "X: 0, Y: 0");
+		coordsText.setCharacterSize(16);
+		coordsText.setFillColor(sf::Color(255, 255, 255, 180));
+		coordsText.setPosition({ 10.f, 10.f });
+
+		sf::RectangleShape cellCursor({ cellSize, cellSize });
+		cellCursor.setFillColor(sf::Color::Transparent);
+		cellCursor.setOutlineColor(sf::Color(255, 255, 255, 150));
+		cellCursor.setOutlineThickness(-1.f);
+
+		bool showCursor = false;
+
 		//world.toggleCell(50, 50);
 		//world.toggleCell(51, 50);
 		//world.toggleCell(52, 50);
@@ -186,6 +198,26 @@ int main()
 
 				if (const auto* mouseEvent = event->getIf<sf::Event::MouseMoved>())
 				{
+
+					sf::Vector2f worldPos = window.mapPixelToCoords(mouseEvent->position, worldView);
+
+					int x = static_cast<int>(worldPos.x / cellSize);
+					int y = static_cast<int>(worldPos.y / cellSize);
+
+					if (x >= 0 && x < gridSize && y >= 0 && y < gridSize && worldPos.y < windowSize)
+					{
+						showCursor = true;
+						cellCursor.setPosition({ x * cellSize, y * cellSize });
+
+						coordsText.setString("X: " + to_string(x) + "Y: " + to_string(y));
+					}
+					else
+					{
+						showCursor = false;
+						coordsText.setString("");
+					}
+
+
 					if (isDrawingMode && !running)
 					{
 						sf::Vector2f mousePos = window.mapPixelToCoords(mouseEvent->position, worldView);
@@ -275,11 +307,16 @@ int main()
 				}
 			}
 
+			if (showCursor && !running) window.draw(cellCursor);
+
 			window.setView(window.getDefaultView());
+
 			window.draw(btn);
 			window.draw(btnText);
 			window.draw(clearBtn);
 			window.draw(clearText);
+
+			if (coordsText.getString() != "") window.draw(coordsText);
 
 			window.display();
 		}
