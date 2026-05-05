@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Conway's Life/Conway's Life.vcxproj" Id="ea0f9500-a922-4536-b473-f3d027f00bef" />
+</Solution>
