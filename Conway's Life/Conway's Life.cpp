@@ -8,16 +8,6 @@
 
 using namespace std;
 
-void updateButtonText(sf::Text& text, const sf::RectangleShape& button, const string& newString)
-{
-	text.setString(newString);
-
-	sf::FloatRect bounds = text.getLocalBounds();
-	text.setOrigin(bounds.getCenter());
-
-	text.setPosition(button.getGlobalBounds().getCenter());
-}
-
 void initGrid(sf::VertexArray& grid, int gridSize, float cellSize, float windowSize)
 {
 	grid.clear();
@@ -34,6 +24,56 @@ void initGrid(sf::VertexArray& grid, int gridSize, float cellSize, float windowS
 		grid.append(sf::Vertex({ 0.f, pos }, gridColor));
 		grid.append(sf::Vertex({ windowSize, pos }, gridColor));
 	}
+}
+
+void updateUIPositions(sf::RenderWindow& window, sf::RectangleShape& btn, sf::Text& btnText, sf::RectangleShape& clearBtn, sf::Text& clearText, sf::RectangleShape& bottomPanel, sf::Text& coords)
+{
+	sf::Vector2f winSize = sf::Vector2f(window.getSize());
+
+	btn.setPosition({ winSize.x / 2.f - 130.f, winSize.y - 50.f });
+	btnText.setOrigin(btnText.getLocalBounds().getCenter());
+	btnText.setPosition(btn.getGlobalBounds().getCenter());
+
+	clearBtn.setPosition({ winSize.x / 2.f + 30.f, winSize.y - 50.f });
+	clearText.setOrigin(clearText.getLocalBounds().getCenter());
+	clearText.setPosition(clearBtn.getGlobalBounds().getCenter());
+
+	bottomPanel.setSize({ winSize.x, 60.f });
+	bottomPanel.setPosition({ 0.f, winSize.y - 60.f });
+
+	coords.setPosition({ 20.f, winSize.y - 40.f });
+}
+
+void adjustCameras(const sf::RenderWindow& window, sf::View& uiView, sf::View& worldView)
+{
+	float winW = static_cast<float>(window.getSize().x);
+	float winH = static_cast<float>(window.getSize().y);
+	float bottomPanelHeight = 60.f;
+
+	uiView.setSize({ winW, winH });
+	uiView.setCenter({ winW / 2.f, winH / 2.f });
+
+	float availableH = winH - bottomPanelHeight;
+
+	float minSize = min(winW, winH);
+
+	float vpWidth = minSize / winW;
+	float vpHeght = minSize / winH;
+
+	float vpX = (1.f - vpWidth) / 2.f;
+	float vpY = ((availableH / winH) - vpHeght) / 2.f;
+
+	worldView.setViewport(sf::FloatRect({ vpX, vpY }, { vpWidth, vpHeght }));
+}
+
+void updateButtonText(sf::Text& text, const sf::RectangleShape& button, const string& newString)
+{
+	text.setString(newString);
+
+	sf::FloatRect bounds = text.getLocalBounds();
+	text.setOrigin(bounds.getCenter());
+
+	text.setPosition(button.getGlobalBounds().getCenter());
 }
 
 struct Stamp {
@@ -75,8 +115,8 @@ void initLibrary()
 
 	library[5] = { "Noah's ark", { 
 		{2,-6}, {3,-7}, {3,-5},
-		{5,-7}, 
-		{5,-4}, {6,-4}, {7,-4}, {6,-5}, 
+		{5,-7},
+		{5,-4}, {6,-4}, {7,-4}, {6,-5},
 
 		{-7,3}, {-6,2}, {-5,3},
 		{-7,5},
@@ -110,7 +150,6 @@ int main()
 		const unsigned int uBottomPanel = 60;
 
 		sf::VideoMode vm({ uWindowSize, uWindowSize + uBottomPanel });
-		sf::RenderWindow window(vm, "Conway's Life C++");
 		Universe world(gridSize, gridSize);
 		EvolutionTracker<vector<bool>> tracker;
 
@@ -121,32 +160,46 @@ int main()
 		BackgroundCell empty;
 		bool running = false;
 
-		float currentZoom = 1.0f;
-		sf::View worldView(sf::FloatRect({ 0.f, 0.f }, { (float)windowSize, (float)windowSize }));
-		worldView.setViewport(sf::FloatRect({ 0.f, 0.f }, { 1.f, (float)windowSize / (windowSize + 50.f) }));
-
-		sf::RectangleShape btn({ 120.f, 40.f });
-		btn.setPosition(sf::Vector2f(10, uWindowSize + 10));
-		btn.setFillColor(sf::Color::Blue);
-
 		sf::Font font;
 		if (!font.openFromFile("font.ttf"))
 		{
 			throw runtime_error("Failed to load font: 'font'.ttf");
 		}
 
+		//-----------------
+
+		sf::RenderWindow window(sf::VideoMode({ 800, 800 }), "Conway's Game of Life", sf::Style::Default);
+		window.setFramerateLimit(60);
+
+		window.setMouseCursorVisible(true);
+
+		bool isFullScreen = false;
+
+		float startW = 800.f;
+		float startH = 800.f;
+
+		sf::View uiView(sf::FloatRect({ 0.f, 0.f }, { startW, startH }));
+		sf::View worldView(sf::FloatRect({ 0.f, 0.f }, { startW, startH }));
+
+		adjustCameras(window, uiView, worldView);
+
+		//-----------------
+
+		float currentZoom = 1.f;
+
+		sf::RectangleShape btn({ 120.f, 40.f });
+		btn.setPosition({ startW - 220.f, 50.f });
+		btn.setFillColor(sf::Color::Blue);
+
 		sf::Text btnText(font, "Start");
 		btnText.setCharacterSize(20);
-		btnText.setFillColor(sf::Color::White);
-
 		sf::FloatRect textRect = btnText.getLocalBounds();
 		btnText.setOrigin(textRect.getCenter());
-
 		btnText.setPosition(btn.getGlobalBounds().getCenter());
 
 		sf::RectangleShape clearBtn({ 100.f, 40.f });
 		clearBtn.setFillColor(sf::Color(150, 50, 50));
-		clearBtn.setPosition({ windowSize - 110.f, windowSize + 10.f });
+		clearBtn.setPosition({ startW - 220.f, 120.f });
 
 		sf::Text clearText(font, "Clear");
 		clearText.setCharacterSize(20);
@@ -157,6 +210,11 @@ int main()
 		coordsText.setCharacterSize(16);
 		coordsText.setFillColor(sf::Color(255, 255, 255, 180));
 		coordsText.setPosition({ 10.f, 10.f });
+
+		sf::RectangleShape bottomPanel({ startW, 60.f });
+		bottomPanel.setFillColor(sf::Color(20, 20, 20));
+
+		updateUIPositions(window, btn, btnText, clearBtn, clearText, bottomPanel, coordsText);
 
 		sf::RectangleShape cellCursor({ cellSize, cellSize });
 		cellCursor.setFillColor(sf::Color::Transparent);
@@ -169,12 +227,6 @@ int main()
 
 		int activeStamp = 0;
 		int rotation = 0; // 0: 0°, 1: 90°, 2: 180°, 3: 270°
-
-		//world.toggleCell(50, 50);
-		//world.toggleCell(51, 50);
-		//world.toggleCell(52, 50);
-		//world.toggleCell(52, 49);
-		//world.toggleCell(51, 48);
 
 		deque<vector<bool>> history;
 		const size_t maxHistorySize = 4;
@@ -196,6 +248,12 @@ int main()
 			{
 				if (event->is<sf::Event::Closed>()) window.close();
 
+				if (const auto* resizeEvent = event->getIf<sf::Event::Resized>())
+				{
+					adjustCameras(window, uiView, worldView);
+					updateUIPositions(window, btn, btnText, clearBtn, clearText, bottomPanel, coordsText);
+				}
+
 				if (const auto* keyEvent = event->getIf<sf::Event::KeyPressed>())
 				{
 					if (keyEvent->code >= sf::Keyboard::Key::Num1 && keyEvent->code <= sf::Keyboard::Key::Num5)
@@ -214,7 +272,7 @@ int main()
 							cout << "Selected stamp: " << activeStamp << endl;
 						}
 					}
-					if (keyEvent->code == sf::Keyboard::Key::Num0 || keyEvent->code == sf::Keyboard::Key::Escape)
+					if (keyEvent->code == sf::Keyboard::Key::Num0)
 					{
 						activeStamp = 0;
 						cout << "Switched to Pencil" << endl;
@@ -223,6 +281,54 @@ int main()
 					if (keyEvent->code == sf::Keyboard::Key::R)
 					{
 						rotation = (rotation + 1) % 4;
+					}
+
+					if (keyEvent->code == sf::Keyboard::Key::Escape)
+					{
+						window.close();
+					}
+
+					if (keyEvent->code == sf::Keyboard::Key::Space)
+					{
+						if (!running)
+						{
+							if (btnText.getString() == "Start")
+							{
+								tracker.clear();
+								history.clear();
+								window.setTitle("Score: 0 | Alive: " + to_string(count(world.getState().begin(), world.getState().end(), true)));
+							}
+
+							running = true;
+							btn.setFillColor(sf::Color(100, 100, 100));
+							updateButtonText(btnText, btn, "Pause");
+						}
+						else
+						{
+							running = false;
+							btn.setFillColor(sf::Color(200, 100, 0));
+							updateButtonText(btnText, btn, "Resume");
+						}
+					}
+
+					if (keyEvent->code == sf::Keyboard::Key::F11)
+					{
+						if (isFullScreen)
+						{
+							window.create(sf::VideoMode({ 800, 800 }), "Game of Life", sf::Style::Default);
+							isFullScreen = false;
+						}
+						else
+						{
+							window.create(sf::VideoMode::getDesktopMode(), "Game of Life", sf::State::Fullscreen);
+							isFullScreen = true;
+						}
+
+						window.setFramerateLimit(60);
+						window.setMouseCursorVisible(true);
+						
+						adjustCameras(window, uiView, worldView);
+						updateUIPositions(window, btn, btnText, clearBtn, clearText, bottomPanel, coordsText);
 					}
 				}
 
@@ -248,7 +354,7 @@ int main()
 				{
 					if (mouseEvent->button == sf::Mouse::Button::Left)
 					{
-						sf::Vector2f uiMousePos = window.mapPixelToCoords(mouseEvent->position, window.getDefaultView());
+						sf::Vector2f uiMousePos = window.mapPixelToCoords(mouseEvent->position, uiView);
 
 						sf::Vector2f mousePos = window.mapPixelToCoords(mouseEvent->position, worldView);
 
@@ -362,7 +468,7 @@ int main()
 						int x = static_cast<int>(mousePos.x / cellSize);
 						int y = static_cast<int>(mousePos.y / cellSize);
 
-						if (x >= 0 && x < gridSize && y > 0 && y < gridSize)
+						if (x >= 0 && x < gridSize && y >= 0 && y < gridSize)
 						{
 							world.setCell(x, y, targetState);
 						}
@@ -446,8 +552,9 @@ int main()
 
 			if (showCursor && !running) window.draw(cellCursor);
 
-			window.setView(window.getDefaultView());
+			window.setView(uiView);
 
+			window.draw(bottomPanel);
 			window.draw(btn);
 			window.draw(btnText);
 			window.draw(clearBtn);
